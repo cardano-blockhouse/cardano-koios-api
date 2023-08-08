@@ -564,6 +564,41 @@ class KoiosApi
         }
         return collect($returnArray);
     }
+    // Block ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /*
+     * Get summarised details about all blocks (paginated - latest first)
+     *
+     * GET /blocks
+     * @return Collection<BlockList>
+     */
+    public function block_fetchBlocks() {
+
+    }
+
+    /*
+     * Get detailed information about a specific block
+     *
+     * POST /block_info
+     *
+     * @param array block_hashes
+     * @return Collection<BlockInformation>
+     */
+    public function block_fetchBlockInformation(array $block_hashes) {
+
+    }
+
+    /*
+     * Get a list of all transactions included in provided blocks
+     *
+     * POST /block_txs
+     *
+     * @param array block_hashes
+     * @return Collection<BlockTransactions>
+     */
+    public function block_fetchBlockTransactions(array $block_hashes) {
+
+    }
 
     // Epoch ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
