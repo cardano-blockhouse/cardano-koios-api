@@ -2,9 +2,21 @@
 
 namespace CardanoBlockhouse\CardanoKoiosApi;
 
+use CardanoBlockhouse\CardanoKoiosApi\Api\Address\AddressAssets;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Address\AddressInformation;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Address\AddressTransactions;
+use CardanoBlockhouse\CardanoKoiosApi\Api\Address\CredentialTransactions;
+use CardanoBlockhouse\CardanoKoiosApi\Api\Address\CredentialUtxos;
+use CardanoBlockhouse\CardanoKoiosApi\Api\Asset\AssetAddresses;
+use CardanoBlockhouse\CardanoKoiosApi\Api\Asset\AssetHistory;
+use CardanoBlockhouse\CardanoKoiosApi\Api\Asset\AssetInfo;
+use CardanoBlockhouse\CardanoKoiosApi\Api\Asset\AssetList;
+use CardanoBlockhouse\CardanoKoiosApi\Api\Asset\AssetNFTAddress;
+use CardanoBlockhouse\CardanoKoiosApi\Api\Asset\AssetSummary;
+use CardanoBlockhouse\CardanoKoiosApi\Api\Asset\AssetTokenRegistry;
+use CardanoBlockhouse\CardanoKoiosApi\Api\Asset\AssetTransactions;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Asset\PolicyAssetInformation;
+use CardanoBlockhouse\CardanoKoiosApi\Api\Asset\PolicyAssetList;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Epoch\EpochBlockProtocols;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Epoch\EpochInfo;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Epoch\EpochParams;
@@ -22,12 +34,19 @@ use CardanoBlockhouse\CardanoKoiosApi\Api\Pool\PoolMetadata;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Pool\PoolRelays;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Pool\PoolStakeSnapshot;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Pool\PoolUpdates;
+use CardanoBlockhouse\CardanoKoiosApi\Api\StakeAccount\AccountAddresses;
+use CardanoBlockhouse\CardanoKoiosApi\Api\StakeAccount\AccountAssets;
+use CardanoBlockhouse\CardanoKoiosApi\Api\StakeAccount\AccountHistory;
+use CardanoBlockhouse\CardanoKoiosApi\Api\StakeAccount\AccountInformation;
+use CardanoBlockhouse\CardanoKoiosApi\Api\StakeAccount\AccountList;
+use CardanoBlockhouse\CardanoKoiosApi\Api\StakeAccount\AccountRewards;
+use CardanoBlockhouse\CardanoKoiosApi\Api\StakeAccount\AccountTransactions;
+use CardanoBlockhouse\CardanoKoiosApi\Api\StakeAccount\AccountUpdates;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Transactions\TransactionInfos;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Transactions\TransactionMetadata;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Transactions\TransactionMetadataLabels;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Transactions\TransactionStatus;
 use Illuminate\Support\Facades\Http;
-use function PHPUnit\Framework\isNull;
 
 class KoiosApi
 {
@@ -147,23 +166,63 @@ class KoiosApi
      * Get a list of UTxO against input payment credential array including their balances
      *
      * POST /credential_utxos
+     *
+     * @param array payment_credentials
+     * @return Collection<CredentialUtxos>
      */
-    public function address_fetchCredentialUtxos() {}
+    public function address_fetchCredentialUtxos(array $payment_credentials) {
+        $postParams = [];
+        $postParams['_payment_credentials'] = $payment_credentials;
+        $response = $this->postRequest('/credential_utxos', $postParams);
+        $returnArray = [];
+        foreach ((array) json_decode($response) as $item) {
+            $returnArray[] = CredentialUtxos::from($item);
+        }
+        return collect($returnArray);
+    }
 
     /*
      * Get the list of all the assets (policy, name and quantity) for given addresses
      *
      * POST /address_assets
+     *
+     * @param array addresses
+     * @return Collection<AddressAssets>
      */
-    public function address_fetchAddressAssets() {}
+    public function address_fetchAddressAssets(array $addresses) {
+        $postParams = [];
+        $postParams['_addresses'] = $addresses;
+        $response = $this->postRequest('/address_assets', $postParams);
+        $returnArray = [];
+        foreach ((array) json_decode($response) as $item) {
+            $returnArray[] = AddressAssets::from($item);
+        }
+        return collect($returnArray);
+    }
 
     /*
      * Get the transaction hash list of input payment credential array, optionally filtering after specified block
      * height (inclusive)
      *
      * POST /credential_txs
+     *
+     * @param array payment_credentials
+     * @param int after_blockheight (optional)
+     * @return Collection<CredentialUtxos>
      */
-    public function address_fetchCredentialTxs() {}
+    public function address_fetchCredentialTxs(array $payment_credentials, int $after_blockheight = null) {
+        $postParams = [];
+        $postParams['_payment_credentials'] = $payment_credentials;
+        if($after_blockheight) {
+            $postParams['_after_block_height'] = $after_blockheight;
+        }
+        $response = $this->postRequest('/credential_txs', $postParams);
+        $returnArray = [];
+        foreach ((array) json_decode($response) as $item) {
+            $returnArray[] = CredentialTransactions::from($item);
+        }
+        return collect($returnArray);
+    }
 
     // Asset ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -171,15 +230,57 @@ class KoiosApi
      * Get the list of all native assets (paginated)
      *
      * GET /asset_list
+     *
+     * @return Collection<AssetList>
      */
-    public function asset_fetchAssetList() {}
+    public function asset_fetchAssetList() {
+        $limit = self::KOIOS_API_LIMIT;
+        $offset = self::KOIOS_OFFSET_START;
+        $assets = self::KOIOS_COUNT_START;
+        $returnArray = [];
+
+        while($assets > 0) {
+
+            $response = $this->getRequest('/asset_list', null, $limit, $offset);
+            $assetsArray = (array) json_decode($response);
+            $assets = count($assetsArray);
+
+            foreach ($assetsArray as $item) {
+                $returnArray[] = AssetList::from($item);
+            }
+
+            $offset = $offset + $assets;
+        }
+        return collect($returnArray);
+    }
 
     /*
      * Get a list of assets registered via token registry on github
      *
      * GET /asset_token_registry
+     *
+     * @return Collection<AssetTokenRegistry>
      */
-    public function asset_fetchAssetTokenRegistry() {}
+    public function asset_fetchAssetTokenRegistry() {
+        $limit = self::KOIOS_API_LIMIT;
+        $offset = self::KOIOS_OFFSET_START;
+        $assetTokenRegistries = self::KOIOS_COUNT_START;
+        $returnArray = [];
+
+        while($assetTokenRegistries > 0) {
+
+            $response = $this->getRequest('/asset_token_registry', null, $limit, $offset);
+            $assetTokenRegistryArray = (array) json_decode($response);
+            $assetTokenRegistries = count($assetTokenRegistryArray);
+
+            foreach ($assetTokenRegistryArray as $item) {
+                $returnArray[] = AssetTokenRegistry::from($item);
+            }
+
+            $offset = $offset + $assetTokenRegistries;
+        }
+        return collect($returnArray);
+    }
 
     /*
      * Get the list of all addresses holding a given asset
@@ -190,23 +291,105 @@ class KoiosApi
      * for themselves served via Koios.
      *
      * GET /asset_addresses
+     *
+     * @param string asset_policy
+     * @param string asset_name (optional)
+     * @return Collection<AssetAddresses>
      */
-    public function asset_fetchAssetAddresses() {}
+    public function asset_fetchAssetAddresses(string $asset_policy, string  $asset_name = null) {
+        $params[] = '_asset_policy=' . $asset_policy;
+        if($asset_name) {
+            $params[] = '_asset_name=' . $asset_name;
+        }
+
+        $limit = self::KOIOS_API_LIMIT;
+        $offset = self::KOIOS_OFFSET_START;
+        $assetAddresses = self::KOIOS_COUNT_START;
+        $returnArray = [];
+
+        while($assetAddresses > 0) {
+
+            $response = $this->getRequest('/asset_addresses', $params, $limit, $offset);
+            $assetAddressesArray = (array) json_decode($response);
+            $assetAddresses = count($assetAddressesArray);
+
+            foreach ($assetAddressesArray as $item) {
+                $returnArray[] = AssetAddresses::from($item);
+            }
+
+            $offset = $offset + $assetAddresses;
+        }
+        return collect($returnArray);
+    }
 
     /*
      * Get the address where specified NFT currently reside on.
      *
      * GET /asset_nft_address
+     *
+     * @param string asset_policy
+     * @param string asset_name (optional)
+     * @return Collection<AssetNFTAddress>
      */
-    public function asset_fetchAssetNftAddress() {}
+    public function asset_fetchAssetNftAddress(string $asset_policy, string  $asset_name = null) {
+        $params[] = '_asset_policy=' . $asset_policy;
+        if($asset_name) {
+            $params[] = '_asset_name=' . $asset_name;
+        }
+
+        $limit = self::KOIOS_API_LIMIT;
+        $offset = self::KOIOS_OFFSET_START;
+        $assetNftAddresses = self::KOIOS_COUNT_START;
+        $returnArray = [];
+
+        while($assetNftAddresses > 0) {
+
+            $response = $this->getRequest('/asset_nft_address', $params, $limit, $offset);
+            $assetNftAddressesArray = (array) json_decode($response);
+            $assetNftAddresses = count($assetNftAddressesArray);
+
+            foreach ($assetNftAddressesArray as $item) {
+                $returnArray[] = AssetNFTAddress::from($item);
+            }
+
+            $offset = $offset + $assetNftAddresses;
+        }
+        return collect($returnArray);
+    }
 
     /*
      * Get the information of an asset including first minting & token registry metadata
      *
      * GET /asset_info
+     *
+     * @param string asset_policy
+     * @param string asset_name (optional)
+     * @return Collection<AssetInfo>
      */
-    public function asset_fetchAssetInfo() {
+    public function asset_fetchAssetInfo(string $asset_policy, string  $asset_name = null) {
+        $params[] = '_asset_policy=' . $asset_policy;
+        if($asset_name) {
+            $params[] = '_asset_name=' . $asset_name;
+        }
 
+        $limit = self::KOIOS_API_LIMIT;
+        $offset = self::KOIOS_OFFSET_START;
+        $assetInfos = self::KOIOS_COUNT_START;
+        $returnArray = [];
+
+        while($assetInfos > 0) {
+
+            $response = $this->getRequest('/asset_info', $params, $limit, $offset);
+            $assetInfoArray = (array) json_decode($response);
+            $assetInfos = count($assetInfoArray);
+
+            foreach ($assetInfoArray as $item) {
+                $returnArray[] = AssetInfo::from($item);
+            }
+
+            $offset = $offset + $assetInfos;
+        }
+        return collect($returnArray);
     }
 
     /*
@@ -222,9 +405,35 @@ class KoiosApi
      * Get the mint/burn history of an asset
      *
      * GET /asset_history
+     *
+     * @param string asset_policy
+     * @param string asset_name (optional)
+     * @return Collection<AssetHistory>
      */
-    public function asset_fetchAssetHistory() {
+    public function asset_fetchAssetHistory(string $asset_policy, string  $asset_name = null) {
+        $params[] = '_asset_policy=' . $asset_policy;
+        if($asset_name) {
+            $params[] = '_asset_name=' . $asset_name;
+        }
 
+        $limit = self::KOIOS_API_LIMIT;
+        $offset = self::KOIOS_OFFSET_START;
+        $assetHistories = self::KOIOS_COUNT_START;
+        $returnArray = [];
+
+        while($assetHistories > 0) {
+
+            $response = $this->getRequest('/asset_history', $params, $limit, $offset);
+            $assetHistoryArray = (array) json_decode($response);
+            $assetHistories = count($assetHistoryArray);
+
+            foreach ($assetHistoryArray as $item) {
+                $returnArray[] = AssetHistory::from($item);
+            }
+
+            $offset = $offset + $assetHistories;
+        }
+        return collect($returnArray);
     }
 
     /*
@@ -263,9 +472,18 @@ class KoiosApi
      * Get the list of asset under the given policy (including balances)
      *
      * GET /policy_asset_list
+     *
+     * @param string asset_policy
+     * @return Collection<PolicyAssetList>
      */
-    public function asset_fetchPolicyAssetList() {
-
+    public function asset_fetchPolicyAssetList(string $asset_policy) {
+        $params[] = '_asset_policy=' . $asset_policy;
+        $response = $this->getRequest('/policy_asset_list', $params);
+        $returnArray = [];
+        foreach ((array) json_decode($response) as $item) {
+            $returnArray[] = PolicyAssetList::from($item);
+        }
+        return collect($returnArray);
     }
 
     /*
@@ -273,18 +491,78 @@ class KoiosApi
      * balance)
      *
      * GET /asset_summary
+     *
+     * @param string asset_policy
+     * @param string asset_name (optional)
+     * @return Collection<AssetSummary>
      */
-    public function asset_fetchAssetSummary() {
+    public function asset_fetchAssetSummary(string $asset_policy, string  $asset_name = null) {
+        $params[] = '_asset_policy=' . $asset_policy;
+        if($asset_name) {
+            $params[] = '_asset_name=' . $asset_name;
+        }
 
+        $limit = self::KOIOS_API_LIMIT;
+        $offset = self::KOIOS_OFFSET_START;
+        $assetSummaries = self::KOIOS_COUNT_START;
+        $returnArray = [];
+
+        while($assetSummaries > 0) {
+
+            $response = $this->getRequest('/asset_summary', $params, $limit, $offset);
+            $assetSummariyArray = (array) json_decode($response);
+            $assetSummaries = count($assetSummariyArray);
+
+            foreach ($assetSummariyArray as $item) {
+                $returnArray[] = AssetSummary::from($item);
+            }
+
+            $offset = $offset + $assetSummaries;
+        }
+        return collect($returnArray);
     }
 
     /*
      * Get the list of current or all asset transaction hashes (newest first)
      *
      * GET /asset_txs
+     *
+     * @param string asset_policy
+     * @param string asset_name (optional)
+     * @param string after_block_height (optional)
+     * @param string history (optional)
+     * @return Collection<AssetTransactions>
      */
-    public function asset_fetchAssetTxs() {
+    public function asset_fetchAssetTxs(string $asset_policy, string  $asset_name = null, int $after_block_height = null, string  $history = null) {
+        $params[] = '_asset_policy=' . $asset_policy;
+        if($asset_name) {
+            $params[] = '_asset_name=' . $asset_name;
+        }
+        if($after_block_height) {
+            $params[] = '_after_block_height=' . $after_block_height;
+        }
+        if($history) {
+            $params[] = 'history=' . $history;
+        }
 
+        $limit = self::KOIOS_API_LIMIT;
+        $offset = self::KOIOS_OFFSET_START;
+        $assetTransactions = self::KOIOS_COUNT_START;
+        $returnArray = [];
+
+        while($assetTransactions > 0) {
+
+            $response = $this->getRequest('/asset_txs', $params, $limit, $offset);
+            $assetTransactionArray = (array) json_decode($response);
+            $assetTransactions = count($assetTransactionArray);
+
+            foreach ($assetTransactionArray as $item) {
+                $returnArray[] = AssetTransactions::from($item);
+            }
+
+            $offset = $offset + $assetTransactions;
+        }
+        return collect($returnArray);
     }
 
     // Epoch ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -744,64 +1022,194 @@ class KoiosApi
      * Get a list of all stake addresses that have atleast 1 transaction
      *
      * GET /account_list
+     *
+     * @return Collection<AccountList>
      */
-    public function account_fetchAccountList() {}
+    public function account_fetchAccountList() {
+        $limit = self::KOIOS_API_LIMIT;
+        $offset = self::KOIOS_OFFSET_START;
+        $stakeAccounts = self::KOIOS_COUNT_START;
+        $returnArray = [];
+
+        while($stakeAccounts > 0) {
+
+            $response = $this->getRequest('/account_list', null, $limit, $offset);
+            $stakeAccountArray = (array) json_decode($response);
+            $stakeAccounts = count($stakeAccountArray);
+
+            foreach ($stakeAccountArray as $item) {
+                $returnArray[] = AccountList::from($item);
+            }
+
+            $offset = $offset + $stakeAccounts;
+        }
+        return collect($returnArray);
+    }
 
     /*
      * Get the account information for given stake addresses
      *
      * POST /account_info
+     *
+     * @param array stake_addresses
+     * @return Collection<AccountInformation>
      */
-    public function account_fetchAccountInfos() {}
+    public function account_fetchAccountInfos(array $stake_addresses) {
+        $postParams = [];
+        $postParams['_stake_addresses'] = $stake_addresses;
+        $response = $this->postRequest('/account_info', $postParams);
+        $returnArray = [];
+        foreach ((array) json_decode($response, true) as $item) {
+            $returnArray[] = AccountInformation::from($item);
+        }
+        return collect($returnArray);
+    }
 
     /*
      * Get a list of all UTxOs for a given stake address (account)
      *
      * GET /account_utxos
+     *
+     * @param string stake_address
+     * @return Collection<AccountTransactions>
      */
-    public function account_fetchAccountUtxos() {}
+    public function account_fetchAccountUtxos(string $stake_address) {
+
+        $params[] = '_stake_address='.$stake_address;
+
+        $limit = self::KOIOS_API_LIMIT;
+        $offset = self::KOIOS_OFFSET_START;
+        $accountTxs = self::KOIOS_COUNT_START;
+        $returnArray = [];
+
+        while($accountTxs > 0) {
+
+            $response = $this->getRequest('/account_utxos', $params, $limit, $offset);
+            $accountTxArray = (array) json_decode($response);
+            $accountTxs = count($accountTxArray);
+
+            foreach ($accountTxArray as $item) {
+                $returnArray[] = AccountTransactions::from($item);
+            }
+
+            $offset = $offset + $accountTxs;
+        }
+        return collect($returnArray);
+    }
 
     /*
      * Get the cached account information for given stake addresses, effective for registered accounts
      *
      * POST /account_info_cached
+     *
+     * @param array stake_addresses
+     * @return Collection<AccountInformation>
      */
-    public function account_fetchAccountInfoCached() {}
+    public function account_fetchAccountInfoCached(array $stake_addresses) {
+        $postParams = [];
+        $postParams['_stake_addresses'] = $stake_addresses;
+        $response = $this->postRequest('/account_info_cached', $postParams);
+        $returnArray = [];
+        foreach ((array) json_decode($response, true) as $item) {
+            $returnArray[] = AccountInformation::from($item);
+        }
+        return collect($returnArray);
+    }
 
     /*
      * Get the full rewards history (including MIR) for given stake addresses
      *
      * POST /account_rewards
+     *
+     * @param array stake_addresses
+     * @return Collection<AccountInformation>
      */
-    public function account_fetchAccountRewards() {}
+    public function account_fetchAccountRewards(array $stake_addresses) {
+        $postParams = [];
+        $postParams['_stake_addresses'] = $stake_addresses;
+        $response = $this->postRequest('/account_rewards', $postParams);
+        $returnArray = [];
+        foreach ((array) json_decode($response, true) as $item) {
+            $returnArray[] = AccountRewards::from($item);
+        }
+        return collect($returnArray);
+    }
 
     /*
      * Get the account updates (registration, deregistration, delegation and withdrawals) for given stake addresses
      *
      * POST /account_updates
+     *
+     * @param array stake_addresses
+     * @return Collection<AccountUpdates>
      */
-    public function account_fetchAccountUpdates() {}
+    public function account_fetchAccountUpdates(array $stake_addresses) {
+        $postParams = [];
+        $postParams['_stake_addresses'] = $stake_addresses;
+        $response = $this->postRequest('/account_updates', $postParams);
+        $returnArray = [];
+        foreach ((array) json_decode($response, true) as $item) {
+            $returnArray[] = AccountUpdates::from($item);
+        }
+        return collect($returnArray);
+    }
 
     /*
      * Get all addresses associated with given staking accounts
      *
      * POST /account_addresses
+     *
+     * @param array stake_addresses
+     * @return Collection<AccountAddresses>
      */
-    public function account_fetchAccountAddresses() {}
+    public function account_fetchAccountAddresses(array $stake_addresses) {
+        $postParams = [];
+        $postParams['_stake_addresses'] = $stake_addresses;
+        $response = $this->postRequest('/account_addresses', $postParams);
+        $returnArray = [];
+        foreach ((array) json_decode($response, true) as $item) {
+            $returnArray[] = AccountAddresses::from($item);
+        }
+        return collect($returnArray);
+    }
 
     /*
      * Get the native asset balance for a given stake address
      *
      * POST /account_assets
+     *
+     * @param array stake_addresses
+     * @return Collection<AccountAssets>
      */
-    public function account_fetchAccountAssets() {}
+    public function account_fetchAccountAssets(array $stake_addresses) {
+        $postParams = [];
+        $postParams['_stake_addresses'] = $stake_addresses;
+        $response = $this->postRequest('/account_assets', $postParams);
+        $returnArray = [];
+        foreach ((array) json_decode($response, true) as $item) {
+            $returnArray[] = AccountAssets::from($item);
+        }
+        return collect($returnArray);
+    }
 
     /*
      * Get the staking history of given stake addresses (accounts)
      *
      * POST /account_history
+     *
+     * @param array stake_addresses
+     * @return Collection<AccountHistory>
      */
-    public function account_fetchAccountHistory() {}
+    public function account_fetchAccountHistory(array $stake_addresses) {
+        $postParams = [];
+        $postParams['_stake_addresses'] = $stake_addresses;
+        $response = $this->postRequest('/account_history', $postParams);
+        $returnArray = [];
+        foreach ((array) json_decode($response, true) as $item) {
+            $returnArray[] = AccountHistory::from($item);
+        }
+        return collect($returnArray);
+    }
 
 
     // Transactions /////////////////////////////////////////////////////////////////////////////////////////////////////
