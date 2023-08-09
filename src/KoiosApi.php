@@ -62,7 +62,7 @@ class KoiosApi
     private $baseUrl = '';
 
     private const MAINNET_URL = 'https://api.koios.rest/api/v0';
-    private const PREPROD_URL = 'https://proprod.koios.rest/api/v0';
+    private const PREPROD_URL = 'https://preprod.koios.rest/api/v0';
     private const PREVIEW_URL = 'https://preview.koios.rest/api/v0';
 
     private const KOIOS_API_LIMIT = 500;
@@ -71,10 +71,8 @@ class KoiosApi
 
     private $limiter;
 
-    public function __construct() {
-        $this->network = 'mainnet';
-        $this->baseUrl = self::MAINNET_URL;
-
+    public function __construct(string $network = 'mainnet') {
+        $this->setNetwork($network);
         $this->limiter = Limiter::create();
     }
 
@@ -144,10 +142,6 @@ class KoiosApi
         return Http::retry(5, 100)->timeout(5)->post($this->baseUrl.$endpoint, $postParams);
     }
 
-    private function submitRequest(string $endpoint, $data) {
-        Http::retry(5, 100)->timeout(5)->withHeaders(['Content-Type' => 'application/cbor'])->post($this->baseUrl.$endpoint, $data);
-    }
-
     private function addGetQueryString(string $endpointUrl, array $params = null) {
         $endpointUrl .= '?';
         foreach ($params as $param) {
@@ -155,8 +149,6 @@ class KoiosApi
         }
         return substr($endpointUrl, 0, -1);
     }
-
-    private function addPostParams() {}
 
     // Address /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -596,7 +588,7 @@ class KoiosApi
      * @param array horizontal_filter (optional)
      * @return Collection<AssetTransactions>
      */
-    public function asset_fetchAssetTxs(string $asset_policy, string  $asset_name = null, int $after_block_height = null, string  $history = null, array $horizontal_filter = null) {
+    public function asset_fetchAssetTxs(string $asset_policy, string  $asset_name = null, int $after_block_height = null, string $history = null, array $horizontal_filter = null) {
         $params[] = '_asset_policy=' . $asset_policy;
         if($asset_name) {
             $params[] = '_asset_name=' . $asset_name;
