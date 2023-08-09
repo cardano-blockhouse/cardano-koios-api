@@ -11,6 +11,6 @@ class NetworkParamUpdates extends Data
         public int|null $block_height,
         public int      $block_time,
         public int      $epoch_no,
-        public string   $data
+        public object   $data
     ) {}
 }

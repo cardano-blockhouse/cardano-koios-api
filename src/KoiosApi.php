@@ -54,6 +54,7 @@ use CardanoBlockhouse\CardanoKoiosApi\Api\Transactions\TransactionMetadata;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Transactions\TransactionMetadataLabels;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Transactions\TransactionStatus;
 use Illuminate\Support\Facades\Http;
+use Psr\Http\Message\StreamInterface;
 
 class KoiosApi
 {
@@ -95,16 +96,41 @@ class KoiosApi
 
     // Requests
 
-    private function getRequest(string $endpoint, array $params = null, $limit = null, $offset = null) {
+    private function getRequest(string $endpoint, array $params = null, $limit = null, $offset = null, array $horizontal_filters = null, array $vertical_filters = null) {
         if (!is_null($params) && count($params) > 0) {
             $endpoint = $this->addGetQueryString($endpoint, $params);
         }
 
         if(isset($limit) && isset($offset)) {
-            if (!is_null($params) && count($params) > 0) {
+            if (isset($params) && count($params) > 0) {
                 $endpoint .= '&limit=' . $limit . '&offset=' . $offset;
             } else {
                 $endpoint .= '?limit=' . $limit . '&offset=' . $offset;
+            }
+        }
+
+        if(isset($horizontal_filters)) {
+            if (isset($params) && count($params) > 0 || (isset($limit) && isset($offset))) {
+                $endpoint .= '&';
+            } else {
+                $endpoint .= '?';
+            }
+            foreach ($horizontal_filters as $horizontal_filter) {
+                $endpoint .= $horizontal_filter.'&';
+            }
+            $endpoint = substr($endpoint, 0, -1);
+        }
+
+        if(isset($vertical_filters)) {
+            $vertical_filter_string = 'select=';
+            foreach ($vertical_filters as $vertical_filter) {
+                $vertical_filter_string .= $vertical_filter.',';
+            }
+            $vertical_filter_string = substr($vertical_filter_string, 0, -1);
+            if (isset($params) && count($params) > 0 || (isset($limit) && isset($offset)) || isset($horizontal_filters)) {
+                $endpoint .= '&'.$vertical_filter_string;
+            } else {
+                $endpoint .= '?'.$vertical_filter_string;
             }
         }
 
@@ -116,6 +142,10 @@ class KoiosApi
     private function postRequest(string $endpoint, array $postParams) {
         $this->limiter->nextRequest();
         return Http::retry(5, 100)->timeout(5)->post($this->baseUrl.$endpoint, $postParams);
+    }
+
+    private function submitRequest(string $endpoint, $data) {
+        Http::retry(5, 100)->timeout(5)->withHeaders(['Content-Type' => 'application/cbor'])->post($this->baseUrl.$endpoint, $data);
     }
 
     private function addGetQueryString(string $endpointUrl, array $params = null) {
@@ -243,9 +273,11 @@ class KoiosApi
      *
      * GET /asset_list
      *
+     * @param array $horizontal_filter (optional)
+     *
      * @return Collection<AssetList>
      */
-    public function asset_fetchAssetList() {
+    public function asset_fetchAssetList(array $horizontal_filter = null) {
         $limit = self::KOIOS_API_LIMIT;
         $offset = self::KOIOS_OFFSET_START;
         $assets = self::KOIOS_COUNT_START;
@@ -253,7 +285,7 @@ class KoiosApi
 
         while($assets > 0) {
 
-            $response = $this->getRequest('/asset_list', null, $limit, $offset);
+            $response = $this->getRequest('/asset_list', null, $limit, $offset, $horizontal_filter);
             $assetsArray = (array) json_decode($response);
             $assets = count($assetsArray);
 
@@ -271,9 +303,10 @@ class KoiosApi
      *
      * GET /asset_token_registry
      *
+     * @param array horizontal_filter (optional)
      * @return Collection<AssetTokenRegistry>
      */
-    public function asset_fetchAssetTokenRegistry() {
+    public function asset_fetchAssetTokenRegistry(array $horizontal_filter = null) {
         $limit = self::KOIOS_API_LIMIT;
         $offset = self::KOIOS_OFFSET_START;
         $assetTokenRegistries = self::KOIOS_COUNT_START;
@@ -281,7 +314,7 @@ class KoiosApi
 
         while($assetTokenRegistries > 0) {
 
-            $response = $this->getRequest('/asset_token_registry', null, $limit, $offset);
+            $response = $this->getRequest('/asset_token_registry', null, $limit, $offset, $horizontal_filter);
             $assetTokenRegistryArray = (array) json_decode($response);
             $assetTokenRegistries = count($assetTokenRegistryArray);
 
@@ -306,9 +339,10 @@ class KoiosApi
      *
      * @param string asset_policy
      * @param string asset_name (optional)
+     * @param array horizontal_filter (optional)
      * @return Collection<AssetAddresses>
      */
-    public function asset_fetchAssetAddresses(string $asset_policy, string  $asset_name = null) {
+    public function asset_fetchAssetAddresses(string $asset_policy, string  $asset_name = null, array $horizontal_filter = null) {
         $params[] = '_asset_policy=' . $asset_policy;
         if($asset_name) {
             $params[] = '_asset_name=' . $asset_name;
@@ -321,7 +355,7 @@ class KoiosApi
 
         while($assetAddresses > 0) {
 
-            $response = $this->getRequest('/asset_addresses', $params, $limit, $offset);
+            $response = $this->getRequest('/asset_addresses', $params, $limit, $offset, $horizontal_filter);
             $assetAddressesArray = (array) json_decode($response);
             $assetAddresses = count($assetAddressesArray);
 
@@ -341,9 +375,10 @@ class KoiosApi
      *
      * @param string asset_policy
      * @param string asset_name (optional)
+     * @param array horizontal_filter (optional)
      * @return Collection<AssetNFTAddress>
      */
-    public function asset_fetchAssetNftAddress(string $asset_policy, string  $asset_name = null) {
+    public function asset_fetchAssetNftAddress(string $asset_policy, string  $asset_name = null, array $horizontal_filter = null) {
         $params[] = '_asset_policy=' . $asset_policy;
         if($asset_name) {
             $params[] = '_asset_name=' . $asset_name;
@@ -356,7 +391,7 @@ class KoiosApi
 
         while($assetNftAddresses > 0) {
 
-            $response = $this->getRequest('/asset_nft_address', $params, $limit, $offset);
+            $response = $this->getRequest('/asset_nft_address', $params, $limit, $offset, $horizontal_filter);
             $assetNftAddressesArray = (array) json_decode($response);
             $assetNftAddresses = count($assetNftAddressesArray);
 
@@ -376,9 +411,10 @@ class KoiosApi
      *
      * @param string asset_policy
      * @param string asset_name (optional)
+     * @param array horizontal_filter (optinal)
      * @return Collection<AssetInfo>
      */
-    public function asset_fetchAssetInfo(string $asset_policy, string  $asset_name = null) {
+    public function asset_fetchAssetInfo(string $asset_policy, string  $asset_name = null, array $horizontal_filter = null) {
         $params[] = '_asset_policy=' . $asset_policy;
         if($asset_name) {
             $params[] = '_asset_name=' . $asset_name;
@@ -391,7 +427,7 @@ class KoiosApi
 
         while($assetInfos > 0) {
 
-            $response = $this->getRequest('/asset_info', $params, $limit, $offset);
+            $response = $this->getRequest('/asset_info', $params, $limit, $offset, $horizontal_filter);
             $assetInfoArray = (array) json_decode($response);
             $assetInfos = count($assetInfoArray);
 
@@ -430,9 +466,10 @@ class KoiosApi
      *
      * @param string asset_policy
      * @param string asset_name (optional)
+     * @param array horizontal_filter (optional)
      * @return Collection<AssetHistory>
      */
-    public function asset_fetchAssetHistory(string $asset_policy, string  $asset_name = null) {
+    public function asset_fetchAssetHistory(string $asset_policy, string  $asset_name = null, array $horizontal_filter = null) {
         $params[] = '_asset_policy=' . $asset_policy;
         if($asset_name) {
             $params[] = '_asset_name=' . $asset_name;
@@ -445,7 +482,7 @@ class KoiosApi
 
         while($assetHistories > 0) {
 
-            $response = $this->getRequest('/asset_history', $params, $limit, $offset);
+            $response = $this->getRequest('/asset_history', $params, $limit, $offset, $horizontal_filter);
             $assetHistoryArray = (array) json_decode($response);
             $assetHistories = count($assetHistoryArray);
 
@@ -478,11 +515,12 @@ class KoiosApi
      * GET /policy_asset_info
      *
      * @param string asset_policy
+     * @param array horizontal_filter (optional)
      * @return Collection<PolicyAssetInformation>
      */
-    public function asset_fetchPolicyAssetInfo(string $asset_policy) {
+    public function asset_fetchPolicyAssetInfo(string $asset_policy, array $horizontal_filter = null) {
         $params[] = '_asset_policy=' . $asset_policy;
-        $response = $this->getRequest('/policy_asset_info', $params);
+        $response = $this->getRequest('/policy_asset_info', $params, null, null, $horizontal_filter);
         $returnArray = [];
         foreach ((array) json_decode($response) as $item) {
             $returnArray[] = PolicyAssetInformation::from($item);
@@ -496,11 +534,12 @@ class KoiosApi
      * GET /policy_asset_list
      *
      * @param string asset_policy
+     * @param array horizontal_filter (optional)
      * @return Collection<PolicyAssetList>
      */
-    public function asset_fetchPolicyAssetList(string $asset_policy) {
+    public function asset_fetchPolicyAssetList(string $asset_policy, array $horizontal_filter = null) {
         $params[] = '_asset_policy=' . $asset_policy;
-        $response = $this->getRequest('/policy_asset_list', $params);
+        $response = $this->getRequest('/policy_asset_list', $params, null, null, $horizontal_filter);
         $returnArray = [];
         foreach ((array) json_decode($response) as $item) {
             $returnArray[] = PolicyAssetList::from($item);
@@ -516,9 +555,10 @@ class KoiosApi
      *
      * @param string asset_policy
      * @param string asset_name (optional)
+     * @param array horizontal_filter (optional)
      * @return Collection<AssetSummary>
      */
-    public function asset_fetchAssetSummary(string $asset_policy, string  $asset_name = null) {
+    public function asset_fetchAssetSummary(string $asset_policy, string  $asset_name = null, array $horizontal_filter = null) {
         $params[] = '_asset_policy=' . $asset_policy;
         if($asset_name) {
             $params[] = '_asset_name=' . $asset_name;
@@ -531,7 +571,7 @@ class KoiosApi
 
         while($assetSummaries > 0) {
 
-            $response = $this->getRequest('/asset_summary', $params, $limit, $offset);
+            $response = $this->getRequest('/asset_summary', $params, $limit, $offset, $horizontal_filter);
             $assetSummariyArray = (array) json_decode($response);
             $assetSummaries = count($assetSummariyArray);
 
@@ -553,9 +593,10 @@ class KoiosApi
      * @param string asset_name (optional)
      * @param string after_block_height (optional)
      * @param string history (optional)
+     * @param array horizontal_filter (optional)
      * @return Collection<AssetTransactions>
      */
-    public function asset_fetchAssetTxs(string $asset_policy, string  $asset_name = null, int $after_block_height = null, string  $history = null) {
+    public function asset_fetchAssetTxs(string $asset_policy, string  $asset_name = null, int $after_block_height = null, string  $history = null, array $horizontal_filter = null) {
         $params[] = '_asset_policy=' . $asset_policy;
         if($asset_name) {
             $params[] = '_asset_name=' . $asset_name;
@@ -574,7 +615,7 @@ class KoiosApi
 
         while($assetTransactions > 0) {
 
-            $response = $this->getRequest('/asset_txs', $params, $limit, $offset);
+            $response = $this->getRequest('/asset_txs', $params, $limit, $offset, $horizontal_filter);
             $assetTransactionArray = (array) json_decode($response);
             $assetTransactions = count($assetTransactionArray);
 
@@ -592,9 +633,11 @@ class KoiosApi
      * Get summarised details about all blocks (paginated - latest first)
      *
      * GET /blocks
+     *
+     * @param array horizontal_filter (optinal)
      * @return Collection<BlockList>
      */
-    public function block_fetchBlocks() {
+    public function block_fetchBlocks(array $horizontal_filter = null) {
 
         $limit = self::KOIOS_API_LIMIT;
         $offset = self::KOIOS_OFFSET_START;
@@ -603,7 +646,7 @@ class KoiosApi
 
         while($blocks > 0) {
 
-            $response = $this->getRequest('/blocks', null, $limit, $offset);
+            $response = $this->getRequest('/blocks', null, $limit, $offset, $horizontal_filter);
             $blocksArray = (array) json_decode($response);
             $blocks = count($blocksArray);
 
@@ -663,9 +706,10 @@ class KoiosApi
      *
      * @param epoch_no (optional)
      * @param include_next_epoch (optional)
+     * @param array horizontal_filter (optinal)
      * @return Collection<EpochInfo>
      */
-    public function epoch_fetchEpochInfo(string $epoch_no = null, string $include_next_epoch = null) {
+    public function epoch_fetchEpochInfo(string $epoch_no = null, string $include_next_epoch = null, array $horizontal_filter = null) {
         $params = null;
         if (!is_null($epoch_no)) {
             $params[] = '_epoch_no=' . $epoch_no;
@@ -674,7 +718,7 @@ class KoiosApi
             $params[] = '_include_next_epoch=' . $include_next_epoch;
         }
 
-        $response = $this->getRequest('/epoch_info', $params);
+        $response = $this->getRequest('/epoch_info', $params, null, null, $horizontal_filter);
 
         foreach ((array) json_decode($response) as $item) {
             $returnArray[] = EpochInfo::from($item);
@@ -688,15 +732,16 @@ class KoiosApi
      * GET /epoch_params
      *
      * @param epoch_no (optional)
+     * @param array horizontal_filter (optinal)
      * @return Collection<EpochParams>
      */
-    public function epoch_fetchEpochParams(string $epoch_no = null) {
+    public function epoch_fetchEpochParams(string $epoch_no = null, array $horizontal_filter = null) {
         $params = null;
         if (!is_null($epoch_no)) {
             $params[] = '_epoch_no=' . $epoch_no;
         }
 
-        $response = $this->getRequest('/epoch_params', $params);
+        $response = $this->getRequest('/epoch_params', $params, null, null, $horizontal_filter);
 
         foreach ((array) json_decode($response) as $item) {
             $returnArray[] = EpochParams::from($item);
@@ -710,15 +755,16 @@ class KoiosApi
      * GET /epoch_block_protocols
      *
      * @param epoch_no (optional)
+     * @param array horizontal_filter (optional)
      * @return Collection<EpochBlockProtocols>
      */
-    public function epoch_fetchEpochBlockProtocols(string $epoch_no = null) {
+    public function epoch_fetchEpochBlockProtocols(string $epoch_no = null, array $horizontal_filter = null) {
         $params = null;
         if (!is_null($epoch_no)) {
             $params[] = '_epoch_no=' . $epoch_no;
         }
 
-        $response = $this->getRequest('/epoch_block_protocols', $params);
+        $response = $this->getRequest('/epoch_block_protocols', $params, null, null, $horizontal_filter);
 
         foreach ((array) json_decode($response) as $item) {
             $returnArray[] = EpochBlockProtocols::from($item);
@@ -759,17 +805,16 @@ class KoiosApi
      * GET /totals
      *
      * @param string epoch_no
+     * @param array horizontal_filter (optional)
      * @return Collection<NetworkTotals>
      */
-    public function network_fetchTotals(string $epoch_no = null, string $filter = null) {
+    public function network_fetchTotals(string $epoch_no = null, array $horizontal_filter = null) {
         $params = null;
         if (!is_null($epoch_no)) {
             $params[] = '_epoch_no=' . $epoch_no;
         }
-        if (!is_null($filter)) {
-            $params[] = $filter;
-        }
-        $response = $this->getRequest('/totals', $params);
+
+        $response = $this->getRequest('/totals', $params, null, null, $horizontal_filter);
         $returnArray = [];
         foreach ((array) json_decode($response) as $item) {
             $returnArray[] = NetworkTotals::from($item);
@@ -782,11 +827,16 @@ class KoiosApi
      *
      * GET /param_updates
      *
-     * @return NetworkParamUpdates
+     * @param array horizontal_filter (optional)
+     * @return Collection<NetworkParamUpdates>
      */
-    public function network_fetchParamUpdates() {
-        $response = $this->getRequest('/param_updates');
-        return NetworkParamUpdates::from(json_decode($response));
+    public function network_fetchParamUpdates(array $horizontal_filter = null) {
+        $response = $this->getRequest('/param_updates', null, null, null, $horizontal_filter);
+        $returnArray = [];
+        foreach ((array) json_decode($response) as $item) {
+            $returnArray[] = NetworkParamUpdates::from($item);
+        }
+        return collect($returnArray);
     }
 
     // Pool ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -796,9 +846,10 @@ class KoiosApi
      *
      * GET /pool_list
      *
+     * @param array horizontal_filter (optional)
      * @return Collection<PoolList>
      */
-    public function pool_fetchPoolList() {
+    public function pool_fetchPoolList(array $horizontal_filter = null) {
         $limit = self::KOIOS_API_LIMIT;
         $offset = self::KOIOS_OFFSET_START;
         $pools = self::KOIOS_COUNT_START;
@@ -806,7 +857,7 @@ class KoiosApi
 
         while($pools > 0) {
 
-            $response = $this->getRequest('/pool_list', null, $limit, $offset);
+            $response = $this->getRequest('/pool_list', null, $limit, $offset, $horizontal_filter);
             $poolInfos = (array) json_decode($response);
             $pools = count($poolInfos);
 
@@ -844,11 +895,12 @@ class KoiosApi
      * GET /pool_stake_snapshot
      *
      * @param string pool_bech32
+     * @param array horizontal_filter (optional)
      * @return Collection<PoolStakeSnapshot>
      */
-    public function pool_fetchPoolStakeSnapshot(string $pool_bech32) {
+    public function pool_fetchPoolStakeSnapshot(string $pool_bech32, array $horizontal_filter = null) {
         $params[] = '_pool_bech32='.$pool_bech32;
-        $response = $this->getRequest('/pool_stake_snapshot', $params);
+        $response = $this->getRequest('/pool_stake_snapshot', $params, null, null, $horizontal_filter);
         $returnArray = [];
         foreach ((array) json_decode($response, true) as $item) {
             $returnArray[] = PoolStakeSnapshot::from($item);
@@ -862,9 +914,10 @@ class KoiosApi
      * GET /pool_delegators
      *
      * @param string pool_bech32
+     * @param array horizontal_filter (optional)
      * @return Collection<PoolStakeSnapshot>
      */
-    public function pool_fetchPoolDelegators(string $pool_bech32) {
+    public function pool_fetchPoolDelegators(string $pool_bech32, array $horizontal_filter = null) {
         $params[] = '_pool_bech32='.$pool_bech32;
 
         $limit = self::KOIOS_API_LIMIT;
@@ -874,7 +927,7 @@ class KoiosApi
 
         while($delegators > 0) {
 
-            $response = $this->getRequest('/pool_delegators', $params, $limit, $offset);
+            $response = $this->getRequest('/pool_delegators', $params, $limit, $offset, $horizontal_filter);
             $delegatorsArray = (array) json_decode($response);
             $delegators = count($delegatorsArray);
 
@@ -895,9 +948,10 @@ class KoiosApi
      *
      * @param string pool_bech32
      * @param string epoch_no (optional)
+     * @param array horizontal_filter (optional)
      * @return Collection<PoolDelegatorHistory>
      */
-    public function pool_fetchDelegatorsHistory(string $pool_bech32, string $epoch_no = null) {
+    public function pool_fetchDelegatorsHistory(string $pool_bech32, string $epoch_no = null, array $horizontal_filter = null) {
         $params[] = '_pool_bech32='.$pool_bech32;
 
         if ($epoch_no) {
@@ -911,7 +965,7 @@ class KoiosApi
 
         while($delegatorHistories > 0) {
 
-            $response = $this->getRequest('/pool_delegators_history', $params, $limit, $offset);
+            $response = $this->getRequest('/pool_delegators_history', $params, $limit, $offset, $horizontal_filter);
             $delegatorHistoryArray = (array) json_decode($response);
             $delegatorHistories = count($delegatorHistoryArray);
 
@@ -931,9 +985,10 @@ class KoiosApi
      *
      * @param string pool_bech32
      * @param string epoch_no (optional)
+     * @param array horizontal_filter (optional)
      * @return Collection<PoolBlocks>
      */
-    public function pool_fetchPoolBlocks(string $pool_bech32, string $epoch_no = null) {
+    public function pool_fetchPoolBlocks(string $pool_bech32, string $epoch_no = null, array $horizontal_filter = null) {
         $params[] = '_pool_bech32='.$pool_bech32;
 
         if ($epoch_no) {
@@ -947,7 +1002,7 @@ class KoiosApi
 
         while($poolBlocks > 0) {
 
-            $response = $this->getRequest('/pool_blocks', $params, $limit, $offset);
+            $response = $this->getRequest('/pool_blocks', $params, $limit, $offset, $horizontal_filter);
             $poolBlocksArray = (array) json_decode($response);
             $poolBlocks = count($poolBlocksArray);
 
@@ -968,9 +1023,10 @@ class KoiosApi
      *
      * @param string pool_bech32
      * @param string epoch_no (optional)
+     * @param array horizontal_filter (optional)
      * @return Collection<PoolHistory>
      */
-    public function pool_fetchPoolHistory(string $pool_bech32, string $epoch_no = null) {
+    public function pool_fetchPoolHistory(string $pool_bech32, string $epoch_no = null, array $horizontal_filter = null) {
         $params[] = '_pool_bech32='.$pool_bech32;
 
         if ($epoch_no) {
@@ -984,7 +1040,7 @@ class KoiosApi
 
         while($poolHistories > 0) {
 
-            $response = $this->getRequest('/pool_history', $params, $limit, $offset);
+            $response = $this->getRequest('/pool_history', $params, $limit, $offset, $horizontal_filter);
             $poolHistoryArray = (array) json_decode($response);
             $poolHistories = count($poolHistoryArray);
 
@@ -1003,9 +1059,10 @@ class KoiosApi
      * GET /pool_updates
      *
      * @param string pool_bech32
+     * @param array horizontal_filter (optional))
      * @return Collection<PoolUpdates>
      */
-    public function pool_fetchPoolUpdates(string $pool_bech32) {
+    public function pool_fetchPoolUpdates(string $pool_bech32, array $horizontal_filter = null) {
         $params[] = '_pool_bech32='.$pool_bech32;
 
         $limit = self::KOIOS_API_LIMIT;
@@ -1015,7 +1072,7 @@ class KoiosApi
 
         while($poolUpdates > 0) {
 
-            $response = $this->getRequest('/pool_updates', $params, $limit, $offset);
+            $response = $this->getRequest('/pool_updates', $params, $limit, $offset, $horizontal_filter);
             $poolUpdatesArray = (array) json_decode($response);
             $poolUpdates = count($poolUpdatesArray);
 
@@ -1033,9 +1090,10 @@ class KoiosApi
      *
      * GET /pool_relays
      *
+     * @param array horizontal_filter (optional)
      * @return Collection<PoolRelays>
      */
-    public function pool_fetchPoolRelays() {
+    public function pool_fetchPoolRelays(array $horizontal_filter = null) {
         $limit = self::KOIOS_API_LIMIT;
         $offset = self::KOIOS_OFFSET_START;
         $poolRelays = self::KOIOS_COUNT_START;
@@ -1043,7 +1101,7 @@ class KoiosApi
 
         while($poolRelays > 0) {
 
-            $response = $this->getRequest('/pool_relays', null, $limit, $offset);
+            $response = $this->getRequest('/pool_relays', null, $limit, $offset, $horizontal_filter);
             $poolRelaysArray = (array) json_decode($response);
             $poolRelays = count($poolRelaysArray);
 
@@ -1082,9 +1140,10 @@ class KoiosApi
      *
      * GET /native_script_list
      *
+     * @param array horizontal_filter (optional)
      * @return Collection<NativeScriptList>
      */
-    public function script_fetchNativeScriptList() {
+    public function script_fetchNativeScriptList(array $horizontal_filter = null) {
         $limit = self::KOIOS_API_LIMIT;
         $offset = self::KOIOS_OFFSET_START;
         $nativeScripts = self::KOIOS_COUNT_START;
@@ -1092,7 +1151,7 @@ class KoiosApi
 
         while($nativeScripts > 0) {
 
-            $response = $this->getRequest('/native_script_list', null, $limit, $offset);
+            $response = $this->getRequest('/native_script_list', null, $limit, $offset, $horizontal_filter);
             $nativeScriptArray = (array) json_decode($response);
             $nativeScripts = count($nativeScriptArray);
 
@@ -1109,8 +1168,11 @@ class KoiosApi
      * List of all existing Plutus script hashes along with their creation transaction hashes
      *
      * GET /plutus_script_list
+     *
+     * @param array horizontal_filter (optional)
+     * @return Collection<PlutusScriptList>
      */
-    public function script_fetchPlutusScriptList() {
+    public function script_fetchPlutusScriptList(array $horizontal_filter = null) {
         $limit = self::KOIOS_API_LIMIT;
         $offset = self::KOIOS_OFFSET_START;
         $plutusScripts = self::KOIOS_COUNT_START;
@@ -1118,7 +1180,7 @@ class KoiosApi
 
         while($plutusScripts > 0) {
 
-            $response = $this->getRequest('/plutus_script_list', null, $limit, $offset);
+            $response = $this->getRequest('/plutus_script_list', null, $limit, $offset, $horizontal_filter);
             $plutusScriptArray = (array) json_decode($response);
             $plutusScripts = count($plutusScriptArray);
 
@@ -1137,9 +1199,10 @@ class KoiosApi
      * GET /script_redeemers
      *
      * @param string script_hash
+     * @param array horizontal_filter (optional)
      * @return Collection<ScriptRedeemer>
      */
-    public function script_fetchScriptRedeemers(string $script_hash) {
+    public function script_fetchScriptRedeemers(string $script_hash, array $horizontal_filter = null) {
 
         $params[] = '_script_hash='.$script_hash;
 
@@ -1150,7 +1213,7 @@ class KoiosApi
 
         while($scriptRedeemers > 0) {
 
-            $response = $this->getRequest('/script_redeemers', $params, $limit, $offset);
+            $response = $this->getRequest('/script_redeemers', $params, $limit, $offset, $horizontal_filter);
             $scriptRedeemerArray = (array) json_decode($response);
             $scriptRedeemers = count($scriptRedeemerArray);
 
@@ -1184,13 +1247,14 @@ class KoiosApi
     // Stake Account ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     /*
-     * Get a list of all stake addresses that have atleast 1 transaction
+     * Get a list of all stake addresses that have at least 1 transaction
      *
      * GET /account_list
      *
+     * @param array horizontal_filter (optional)
      * @return Collection<AccountList>
      */
-    public function account_fetchAccountList() {
+    public function account_fetchAccountList(array $horizontal_filter = null) {
         $limit = self::KOIOS_API_LIMIT;
         $offset = self::KOIOS_OFFSET_START;
         $stakeAccounts = self::KOIOS_COUNT_START;
@@ -1198,7 +1262,7 @@ class KoiosApi
 
         while($stakeAccounts > 0) {
 
-            $response = $this->getRequest('/account_list', null, $limit, $offset);
+            $response = $this->getRequest('/account_list', null, $limit, $offset, $horizontal_filter);
             $stakeAccountArray = (array) json_decode($response);
             $stakeAccounts = count($stakeAccountArray);
 
@@ -1236,9 +1300,10 @@ class KoiosApi
      * GET /account_utxos
      *
      * @param string stake_address
+     * @param array horizontal_filter (optional)
      * @return Collection<AccountTransactions>
      */
-    public function account_fetchAccountUtxos(string $stake_address) {
+    public function account_fetchAccountUtxos(string $stake_address, array $horizontal_filter = null) {
 
         $params[] = '_stake_address='.$stake_address;
 
@@ -1249,7 +1314,7 @@ class KoiosApi
 
         while($accountTxs > 0) {
 
-            $response = $this->getRequest('/account_utxos', $params, $limit, $offset);
+            $response = $this->getRequest('/account_utxos', $params, $limit, $offset, $horizontal_filter);
             $accountTxArray = (array) json_decode($response);
             $accountTxs = count($accountTxArray);
 
@@ -1422,9 +1487,10 @@ class KoiosApi
      *
      * GET /tx_metalabels
      *
+     * @param array horizontal_filter (optional)
      * @return Collection<TransactionMetadataLabels>
      */
-    public function transaction_fetchTransactionMetadataLabels() {
+    public function transaction_fetchTransactionMetadataLabels(array $horizontal_filter = null) {
         $limit = self::KOIOS_API_LIMIT;
         $offset = self::KOIOS_OFFSET_START;
         $transactionMetadata = self::KOIOS_COUNT_START;
@@ -1432,7 +1498,7 @@ class KoiosApi
 
         while($transactionMetadata > 0) {
 
-            $response = $this->getRequest('/tx_metalabels', null, $limit, $offset);
+            $response = $this->getRequest('/tx_metalabels', null, $limit, $offset, $horizontal_filter);
             $transactionMetadataArray = (array) json_decode($response);
             $transactionMetadata = count($transactionMetadataArray);
 
@@ -1448,10 +1514,15 @@ class KoiosApi
     /*
      * Submit an already serialized transaction to the network.
      *
+     * Assuming ${data} is a raw binary serialized transaction on the file-system.
+     * If using a CLI-generated tx file, please ensure to deserialise (using `xxd -p -r <<< $(jq .cborHex ${tx.signed}) > ${data}`) first before submitting.
+     *
      * POST /submittx
+     *
+     * @param
      */
-    public function transaction_submitTransaction() {
-        // TODO
+    public function transaction_submitTransaction(StreamInterface $data) {
+        Http::retry(5, 100)->timeout(5)->withBody($data, 'application/cbor')->post($this->baseUrl.'/submittx');
     }
 
     /*
