@@ -17,6 +17,9 @@ use CardanoBlockhouse\CardanoKoiosApi\Api\Asset\AssetTokenRegistry;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Asset\AssetTransactions;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Asset\PolicyAssetInformation;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Asset\PolicyAssetList;
+use CardanoBlockhouse\CardanoKoiosApi\Api\Block\BlockInformation;
+use CardanoBlockhouse\CardanoKoiosApi\Api\Block\BlockList;
+use CardanoBlockhouse\CardanoKoiosApi\Api\Block\BlockTransactions;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Epoch\EpochBlockProtocols;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Epoch\EpochInfo;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Epoch\EpochParams;
@@ -34,6 +37,10 @@ use CardanoBlockhouse\CardanoKoiosApi\Api\Pool\PoolMetadata;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Pool\PoolRelays;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Pool\PoolStakeSnapshot;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Pool\PoolUpdates;
+use CardanoBlockhouse\CardanoKoiosApi\Api\Script\DatumInformation;
+use CardanoBlockhouse\CardanoKoiosApi\Api\Script\NativeScriptList;
+use CardanoBlockhouse\CardanoKoiosApi\Api\Script\PlutusScriptList;
+use CardanoBlockhouse\CardanoKoiosApi\Api\Script\ScriptRedeemer;
 use CardanoBlockhouse\CardanoKoiosApi\Api\StakeAccount\AccountAddresses;
 use CardanoBlockhouse\CardanoKoiosApi\Api\StakeAccount\AccountAssets;
 use CardanoBlockhouse\CardanoKoiosApi\Api\StakeAccount\AccountHistory;
@@ -149,11 +156,16 @@ class KoiosApi
      * POST /address_txs
      *
      * @param array addresses
+     * @param int after_block_height (optional)
      * @return Collection<AddressTransactions>
      */
-    public function address_fetchAddressTxs(array $addresses) {
+    public function address_fetchAddressTxs(array $addresses, int $after_block_height = null) {
+
         $postParams = [];
         $postParams['_addresses'] = $addresses;
+        if($after_block_height) {
+            $postParams['_after_block_height'] = $after_block_height;
+        }
         $response = $this->postRequest('/address_txs', $postParams);
         $returnArray = [];
         foreach ((array) json_decode($response) as $item) {
@@ -396,9 +408,19 @@ class KoiosApi
      * Get the information of a list of assets including first minting & token registry metadata
      *
      * POST /asset_info
+     *
+     * @param array asset_list
+     * @return Collection<AssetList>
      */
-    public function asset_fetchAssetInfoBulk() {
-
+    public function asset_fetchAssetInfoBulk(array $asset_list) {
+        $postParams = [];
+        $postParams['_asset_list'] = $asset_list;
+        $response = $this->postRequest('/asset_info', $postParams);
+        $returnArray = [];
+        foreach ((array) json_decode($response) as $item) {
+            $returnArray[] = AssetList::from($item);
+        }
+        return collect($returnArray);
     }
 
     /*
@@ -574,6 +596,24 @@ class KoiosApi
      */
     public function block_fetchBlocks() {
 
+        $limit = self::KOIOS_API_LIMIT;
+        $offset = self::KOIOS_OFFSET_START;
+        $blocks = self::KOIOS_COUNT_START;
+        $returnArray = [];
+
+        while($blocks > 0) {
+
+            $response = $this->getRequest('/blocks', null, $limit, $offset);
+            $blocksArray = (array) json_decode($response);
+            $blocks = count($blocksArray);
+
+            foreach ($blocksArray as $item) {
+                $returnArray[] = BlockList::from($item);
+            }
+
+            $offset = $offset + $blocks;
+        }
+        return collect($returnArray);
     }
 
     /*
@@ -585,7 +625,14 @@ class KoiosApi
      * @return Collection<BlockInformation>
      */
     public function block_fetchBlockInformation(array $block_hashes) {
-
+        $postParams = [];
+        $postParams['_block_hashes'] = $block_hashes;
+        $response = $this->postRequest('/block_info', $postParams);
+        $returnArray = [];
+        foreach ((array) json_decode($response) as $item) {
+            $returnArray[] = BlockInformation::from($item);
+        }
+        return collect($returnArray);
     }
 
     /*
@@ -597,7 +644,14 @@ class KoiosApi
      * @return Collection<BlockTransactions>
      */
     public function block_fetchBlockTransactions(array $block_hashes) {
-
+        $postParams = [];
+        $postParams['_block_hashes'] = $block_hashes;
+        $response = $this->postRequest('/block_txs', $postParams);
+        $returnArray = [];
+        foreach ((array) json_decode($response) as $item) {
+            $returnArray[] = BlockTransactions::from($item);
+        }
+        return collect($returnArray);
     }
 
     // Epoch ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1027,29 +1081,105 @@ class KoiosApi
      * List of all existing native script hashes along with their creation transaction hashes
      *
      * GET /native_script_list
+     *
+     * @return Collection<NativeScriptList>
      */
-    public function script_fetchNativeScriptList() {}
+    public function script_fetchNativeScriptList() {
+        $limit = self::KOIOS_API_LIMIT;
+        $offset = self::KOIOS_OFFSET_START;
+        $nativeScripts = self::KOIOS_COUNT_START;
+        $returnArray = [];
+
+        while($nativeScripts > 0) {
+
+            $response = $this->getRequest('/native_script_list', null, $limit, $offset);
+            $nativeScriptArray = (array) json_decode($response);
+            $nativeScripts = count($nativeScriptArray);
+
+            foreach ($nativeScriptArray as $item) {
+                $returnArray[] = NativeScriptList::from($item);
+            }
+
+            $offset = $offset + $nativeScripts;
+        }
+        return collect($returnArray);
+    }
 
     /*
      * List of all existing Plutus script hashes along with their creation transaction hashes
      *
      * GET /plutus_script_list
      */
-    public function script_fetchPlutusScriptList() {}
+    public function script_fetchPlutusScriptList() {
+        $limit = self::KOIOS_API_LIMIT;
+        $offset = self::KOIOS_OFFSET_START;
+        $plutusScripts = self::KOIOS_COUNT_START;
+        $returnArray = [];
+
+        while($plutusScripts > 0) {
+
+            $response = $this->getRequest('/plutus_script_list', null, $limit, $offset);
+            $plutusScriptArray = (array) json_decode($response);
+            $plutusScripts = count($plutusScriptArray);
+
+            foreach ($plutusScriptArray as $item) {
+                $returnArray[] = PlutusScriptList::from($item);
+            }
+
+            $offset = $offset + $plutusScripts;
+        }
+        return collect($returnArray);
+    }
 
     /*
      * List of all redeemers for a given script hash
      *
      * GET /script_redeemers
+     *
+     * @param string script_hash
+     * @return Collection<ScriptRedeemer>
      */
-    public function script_fetchScriptRedeemers() {}
+    public function script_fetchScriptRedeemers(string $script_hash) {
+
+        $params[] = '_script_hash='.$script_hash;
+
+        $limit = self::KOIOS_API_LIMIT;
+        $offset = self::KOIOS_OFFSET_START;
+        $scriptRedeemers = self::KOIOS_COUNT_START;
+        $returnArray = [];
+
+        while($scriptRedeemers > 0) {
+
+            $response = $this->getRequest('/script_redeemers', $params, $limit, $offset);
+            $scriptRedeemerArray = (array) json_decode($response);
+            $scriptRedeemers = count($scriptRedeemerArray);
+
+            foreach ($scriptRedeemerArray as $item) {
+                $returnArray[] = ScriptRedeemer::from($item);
+            }
+
+            $offset = $offset + $scriptRedeemers;
+        }
+        return collect($returnArray);
+    }
 
     /*
      * List of datum information for given datum hashes
      *
      * POST /datum_info
+     *
+     * @param array datum_hashes
      */
-    public function script_fetchDatumInfo() {}
+    public function script_fetchDatumInfo(array $datum_hashes) {
+        $postParams = [];
+        $postParams['_datum_hashes'] = $datum_hashes;
+        $response = $this->postRequest('/datum_info', $postParams);
+        $returnArray = [];
+        foreach ((array) json_decode($response) as $item) {
+            $returnArray[] = DatumInformation::from($item);
+        }
+        return collect($returnArray);
+    }
 
     // Stake Account ///////////////////////////////////////////////////////////////////////////////////////////////////
 
