@@ -724,7 +724,7 @@ class KoiosApi
      * GET /epoch_params
      *
      * @param epoch_no (optional)
-     * @param array horizontal_filter (optinal)
+     * @param array horizontal_filter (optional)
      * @return Collection<EpochParams>
      */
     public function epoch_fetchEpochParams(string $epoch_no = null, array $horizontal_filter = null) {
@@ -1224,6 +1224,7 @@ class KoiosApi
      * POST /datum_info
      *
      * @param array datum_hashes
+     * @return Collection<DatumInformation>
      */
     public function script_fetchDatumInfo(array $datum_hashes) {
         $postParams = [];
@@ -1521,6 +1522,9 @@ class KoiosApi
      * Get the number of block confirmations for a given transaction hash list
      *
      * POST /tx_status
+     *
+     * @param array tx_hashes
+     * @return Collection<TransactionStatus>
      */
     public function transaction_fetchTransactionStatus(array $tx_hashes) {
         $postParams = [];
