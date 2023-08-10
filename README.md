@@ -5,7 +5,7 @@ cardano-koios-api is a Laravel package to use the cardano Koios API in your lara
     - [Installation](#Installation)
     - [Configuration](#Configuration)
     - [Usage](#Usage)
-      - [Horizontal filtering](#Horizontal filtering)
+      - [Horizontal filtering](#horizontal-filtering)
       - [Pagination](#Pagination)
       - [Example](#Example)
       - [Endpoints](#Endpoints)
@@ -17,7 +17,7 @@ cardano-koios-api is a Laravel package to use the cardano Koios API in your lara
         - [Asset](#Asset)
         - [Pool](#Pool)
         - [Script](#Script)
-        - [Stake Account](#Stake Account)
+        - [Stake Account](#stake-account)
     - [Bugs, Suggestions, Contributions and Support](#bugs-and-suggestions)
     - [Copyright and License](#copyright-and-license)
 
