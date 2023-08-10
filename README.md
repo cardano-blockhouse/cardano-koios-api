@@ -5,6 +5,19 @@ cardano-koios-api is a Laravel package to use the cardano Koios API in your lara
     - [Installation](#Installation)
     - [Configuration](#Configuration)
     - [Usage](#Usage)
+      - [Horizontal filtering](#Horizontal filtering)
+      - [Pagination](#Pagination)
+      - [Example](#Example)
+      - [Endpoints](#Endpoints)
+        - [Network](#Network)
+        - [Epoch](#Epoch)
+        - [Block](#Block)
+        - [Transactions](#Transactions)
+        - [Address](#Address)
+        - [Asset](#Asset)
+        - [Pool](#Pool)
+        - [Script](#Script)
+        - [Stake Account](#Stake Account)
     - [Bugs, Suggestions, Contributions and Support](#bugs-and-suggestions)
     - [Copyright and License](#copyright-and-license)
 
@@ -55,7 +68,7 @@ class TestController extends Controller
     public function test() {
         KoiosApi::setNetwork('mainnet');
         foreach (KoiosApi::block_fetchBlocks(['epoch_no=eq.429', 'block_time=gt.1691657145']) as $block) {
-            echo 'Epoch no: '.$block->epoch_no.' - Abs slot: '.$block-> abs_slot;
+            echo 'Epoch no: '.$block->epoch_no.' - Abs slot: '.$block->abs_slot;
         }
     }
 }
