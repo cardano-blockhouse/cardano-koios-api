@@ -15,6 +15,7 @@ use CardanoBlockhouse\CardanoKoiosApi\Api\Asset\AssetNFTAddress;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Asset\AssetSummary;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Asset\AssetTokenRegistry;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Asset\AssetTransactions;
+use CardanoBlockhouse\CardanoKoiosApi\Api\Asset\PolicyAssetAddressList;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Asset\PolicyAssetInformation;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Asset\PolicyAssetList;
 use CardanoBlockhouse\CardanoKoiosApi\Api\Block\BlockInformation;
@@ -496,9 +497,32 @@ class KoiosApi
      * for themselves served via Koios.
      *
      * GET /policy_asset_addresses
+     *
+     * @param string asset_policy
+     * @param array horizontal_filter (optional)
+     * @return Collection<PolicyAssetAddressList>
      */
-    public function asset_fetchPolicyAssetAddresses() {
+    public function asset_fetchPolicyAssetAddresses(string $asset_policy, string $horizontal_filter = null) {
+        $params[] = '_asset_policy=' . $asset_policy;
 
+        $limit = self::KOIOS_API_LIMIT;
+        $offset = self::KOIOS_OFFSET_START;
+        $assetPolicyAddresses = self::KOIOS_COUNT_START;
+        $returnArray = [];
+
+        while($assetPolicyAddresses < 1000) {
+
+            $response = $this->getRequest('/policy_asset_addresses', $params, $limit, $offset, $horizontal_filter);
+            $assetPolicyAddressArray = (array) json_decode($response);
+            $assetPolicyAddresses = count($assetPolicyAddressArray);
+
+            foreach ($assetPolicyAddressArray as $item) {
+                $returnArray[] = PolicyAssetAddressList::from($item);
+            }
+
+            $offset = $offset + $assetPolicyAddresses;
+        }
+        return collect($returnArray);
     }
 
     /*
@@ -796,7 +820,7 @@ class KoiosApi
      *
      * GET /totals
      *
-     * @param string epoch_no
+     * @param string epoch_no (optional)
      * @param array horizontal_filter (optional)
      * @return Collection<NetworkTotals>
      */

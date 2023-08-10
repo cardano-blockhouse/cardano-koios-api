@@ -64,7 +64,7 @@ KoiosApi::network_fetchGenesis();
  *
  * GET /totals
  *
- * @param string epoch_no
+ * @param string epoch_no (optional)
  * @param array horizontal_filter (optional)
  * @return Collection<NetworkTotals>
  */
@@ -332,8 +332,21 @@ KoiosApi::asset_fetchAssetInfoBulk(array $asset_list);;
  */
 KoiosApi::asset_fetchAssetHistory(string $asset_policy, string  $asset_name = null, array $horizontal_filter = null);
 
-
-KoiosApi::asset_fetchPolicyAssetAddresses()
+/*
+ * Get the list of addresses with quantity for each asset on the given policy
+ *
+ * Note - Due to cardano's UTxO design and usage from projects, asset to addresses map can be infinite. Thus, for a
+ * small subset of active projects with millions of transactions, these might end up with timeouts (HTTP code 504)
+ * on free layer. Such large-scale projects are free to subscribe to query layers to have a dedicated cache table
+ * for themselves served via Koios.
+ *
+ * GET /policy_asset_addresses
+ *
+ * @param string asset_policy
+ * @param array horizontal_filter (optional)
+ * @return Collection<PolicyAssetAddressList>
+ */
+KoiosApi::asset_fetchPolicyAssetAddresses(string $asset_policy, string $horizontal_filter = null);
 
 /*
  * Get the information for all assets under the same policy
