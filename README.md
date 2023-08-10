@@ -32,13 +32,37 @@ KoiosApi::setNetwork('preprod');
 ```
 
 ### Horizontal filtering
+https://api.koios.rest/#overview--horizontal-filtering
+
 Example
 ```php
 $horizontal_filter = ['epoch=eq.250', 'epoch_slot=lt.180'];
 ```
 
+### Pagination
+Pagination is automatically done in the backend in chunks of 500 rows per API call.
 
-### Network
+### Example
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use CardanoBlockhouse\CardanoKoiosApi\Facades\KoiosApi;
+
+class TestController extends Controller
+{
+    public function test() {
+        KoiosApi::setNetwork('mainnet');
+        foreach (KoiosApi::block_fetchBlocks(['epoch_no=eq.429', 'block_time=gt.1691657145']) as $block) {
+            echo 'Epoch no: '.$block->epoch_no.' - Abs slot: '.$block-> abs_slot;
+        }
+    }
+}
+```
+### Endpoints
+
+#### Network
 ```php
 /*
  * Get the tip info about the latest block seen by chain
@@ -80,7 +104,7 @@ KoiosApi::network_fetchTotals(string $epoch_no = null, array $horizontal_filter 
  */
 KoiosApi::network_fetchParamUpdates(array $horizontal_filter = null);
 ```
-### Epoch
+#### Epoch
 ```php
 /*
  * Get the epoch information, all epochs if no epoch specified
@@ -116,7 +140,7 @@ KoiosApi::epoch_fetchEpochParams(string $epoch_no = null, array $horizontal_filt
  */
 KoiosApi::epoch_fetchEpochBlockProtocols(string $epoch_no = null, array $horizontal_filter = null);
 ```
-### Block
+#### Block
 ```php
 /*
  * Get summarised details about all blocks (paginated - latest first)
@@ -148,7 +172,7 @@ KoiosApi::block_fetchBlockInformation(array $block_hashes);
  */
 KoiosApi::block_fetchBlockTransactions(array $block_hashes)
 ```
-### Transactions
+#### Transactions
 ```php
 /*
  * Get detailed information about transaction(s)
@@ -190,7 +214,7 @@ KoiosApi::transaction_fetchTransactionMetadataLabels(array $horizontal_filter = 
  */
 KoiosApi::transaction_fetchTransactionStatus(array $tx_hashes);
 ```
-### Address
+#### Address
 ```php
 /*
  * Get address info - balance, associated stake address (if any) and UTxO set for given addresses
@@ -246,7 +270,7 @@ KoiosApi::address_fetchAddressAssets(array $addresses);
  */
 KoiosApi::address_fetchCredentialTxs(array $payment_credentials, int $after_blockheight = null)
 ```
-### Asset
+#### Asset
 ```php
 /*
  * Get the list of all native assets (paginated)
@@ -397,7 +421,7 @@ KoiosApi::asset_fetchAssetSummary(string $asset_policy, string  $asset_name = nu
  */
 KoiosApi::asset_fetchAssetTxs(string $asset_policy, string  $asset_name = null, int $after_block_height = null, string $history = null, array $horizontal_filter = null);
 ```
-### Pool
+#### Pool
 ```php
 /*
  * A list of all currently registered/retiring (not retired) pools
@@ -510,7 +534,7 @@ KoiosApi::pool_fetchPoolRelays(array $horizontal_filter = null);
  */
 KoiosApi::pool_fetchPoolMetadata(array $pool_bech32_ids);
 ```
-### Script
+#### Script
 ```php
 /*
  * List of all existing native script hashes along with their creation transaction hashes
@@ -553,7 +577,7 @@ KoiosApi::script_fetchScriptRedeemers(string $script_hash, array $horizontal_fil
  */
 KoiosApi::script_fetchDatumInfo(array $datum_hashes);
 ```
-### Stake Account
+#### Stake Account
 ```php
 /*
  * Get a list of all stake addresses that have at least 1 transaction
