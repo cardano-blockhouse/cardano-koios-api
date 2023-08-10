@@ -510,7 +510,7 @@ class KoiosApi
         $assetPolicyAddresses = self::KOIOS_COUNT_START;
         $returnArray = [];
 
-        while($assetPolicyAddresses < 1000) {
+        while($assetPolicyAddresses > 0) {
 
             $response = $this->getRequest('/policy_asset_addresses', $params, $limit, $offset, $horizontal_filter);
             $assetPolicyAddressArray = (array) json_decode($response);
