@@ -8,7 +8,7 @@ cardano-koios-api is a Laravel package to use the cardano Koios API in your lara
     - [Usage](#usage)
         - [Horizontal filtering](#horizontal-filtering)
         - [Pagination](#pagination)
-        - [Example](#example)
+        - [Examples](#examples)
         - [Endpoints](#endpoints)
             - [Network](#network)
             - [Epoch](#epoch)
@@ -56,7 +56,9 @@ $horizontal_filter = ['epoch=eq.250', 'epoch_slot=lt.180'];
 ### Pagination
 Pagination is automatically done in the backend in chunks of 500 rows per API call.
 
-### Example
+### Examples
+
+Fetch Blocks
 ```php
 <?php
 
@@ -70,6 +72,31 @@ class TestController extends Controller
         KoiosApi::setNetwork('mainnet');
         foreach (KoiosApi::block_fetchBlocks(['epoch_no=eq.429', 'block_time=gt.1691657145']) as $block) {
             echo 'Epoch no: '.$block->epoch_no.' - Abs slot: '.$block->abs_slot;
+        }
+    }
+}
+```
+
+Fetch TransactionInfo
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use CardanoBlockhouse\CardanoKoiosApi\Facades\KoiosApi;
+
+class TestController extends Controller
+{
+    public function test() {
+        KoiosApi::setNetwork('mainnet');
+        foreach(KoiosApi::transaction_fetchTransactionInfos(['d02f660a68200bf76af5c428a210681b901249cc2ba864bad427eb8dd91b5c2f']) as $transaction) {
+            echo $transaction->epoch_no.'<br>';
+            foreach ($transaction->inputs as $input) {
+                echo $input->stake_addr.' '.$input->value.'<br>';
+            }
+            foreach ($transaction->outputs as $output) {
+                echo $output->stake_addr.' '.$output->value.'<br>';
+            }
         }
     }
 }
@@ -688,4 +715,4 @@ KoiosApi::account_fetchAccountHistory(array $stake_addresses);
 
 ## Copyright and License
 
-[MIT](https://choosealicense.com/licenses/mit/)
+The MIT License (MIT). Please see [License File](LICENSE) for more information.

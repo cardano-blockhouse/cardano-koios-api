@@ -62,6 +62,10 @@ class KoiosApi
     private $network = '';
     private $baseUrl = '';
 
+    private $tier = 'public';
+
+    private $query_timeout = 30;
+
     private const MAINNET_URL = 'https://api.koios.rest/api/v0';
     private const PREPROD_URL = 'https://preprod.koios.rest/api/v0';
     private const PREVIEW_URL = 'https://preview.koios.rest/api/v0';
@@ -89,6 +93,34 @@ class KoiosApi
                 break;
             case 'preview':
                 $this->baseUrl = self::PREVIEW_URL;
+                break;
+        }
+    }
+
+    public function setTier($tier) {
+        switch ($tier) {
+            case 'public':
+                $this->tier = 'public';
+                $this->query_timeout = 30;
+                $this->limiter->setMaxRequests(100);
+                break;
+            case 'free':
+                $this->tier = 'free';
+                $this->query_timeout = 30;
+                $this->limiter->setMaxRequests(100);
+                break;
+            case 'pro':
+                $this->tier = 'pro';
+                $this->query_timeout = 60;
+                $this->limiter->setMaxRequests(250);
+                break;
+            case 'premium':
+                $this->tier = 'premium';
+                $this->query_timeout = 120;
+                $this->limiter->setMaxRequests(500);
+                break;
+            case 'custom':
+                $this->tier = 'custom';
                 break;
         }
     }
@@ -134,13 +166,13 @@ class KoiosApi
         }
 
         $this->limiter->nextRequest();
-        return HTTP::retry(5, 100)->timeout(5)->get($this->baseUrl.$endpoint);
+        return HTTP::retry(5, 100)->timeout($this->query_timeout)->get($this->baseUrl.$endpoint);
 
     }
 
     private function postRequest(string $endpoint, array $postParams) {
         $this->limiter->nextRequest();
-        return Http::retry(5, 100)->timeout(5)->post($this->baseUrl.$endpoint, $postParams);
+        return Http::retry(5, 100)->timeout($this->query_timeout)->post($this->baseUrl.$endpoint, $postParams);
     }
 
     private function addGetQueryString(string $endpointUrl, array $params = null) {

@@ -19,12 +19,16 @@ class Limiter
     private $requestCounter;
     private $lastRequestTime;
 
-    private const MAX_REQUESTS_PER_10_SECONDS = 100;
+    private $max_requests_per_10_seconds = 100;
     private const SLEEP_TIME = 60;
 
     private function __construct() {
         $this->requestCounter = 0;
         $this->lastRequestTime = Carbon::now();
+    }
+
+    public function setMaxRequests($maxRequests) {
+        $this->max_requests_per_10_seconds = $maxRequests;
     }
 
     public function nextRequest() {
@@ -39,11 +43,11 @@ class Limiter
     }
 
     private function getSleepTime() {
-        if (Carbon::now()->diffInSeconds($this->lastRequestTime) > 60 ) {
+        if (Carbon::now()->diffInSeconds($this->lastRequestTime) > 10 ) {
             $this->requestCounter = 0;
             return 0;
         } else {
-            if ($this->requestCounter < self::MAX_REQUESTS_PER_10_SECONDS) {
+            if ($this->requestCounter < $this->max_requests_per_10_seconds) {
                 return 0;
             } else {
                 $this->requestCounter = 0;
